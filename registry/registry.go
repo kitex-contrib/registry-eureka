@@ -82,28 +82,28 @@ func (e *eurekaRegistry) Deregister(info *registry.Info) error {
 func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, error) {
 
 	if info == nil {
-		return nil, NilInfoErr
+		return nil, ErrNilInfo
 	}
 
 	if info.Addr == nil {
-		return nil, NilAddrErr
+		return nil, ErrNilAddr
 	}
 
 	if len(info.ServiceName) == 0 {
-		return nil, EmptyServiceNameErr
+		return nil, ErrEmptyServiceName
 	}
 
 	addr, ok := info.Addr.(*net.TCPAddr)
 	if !ok {
-		return nil, ConvertAddrErr
+		return nil, ErrConvertAddr
 	}
 
 	if len(addr.IP.String()) == 0 {
-		return nil, MissIPErr
+		return nil, ErrMissIP
 	}
 
 	if addr.Port == 0 {
-		return nil, MissPortErr
+		return nil, ErrMissPort
 	}
 
 	if info.Weight == 0 {
@@ -130,15 +130,16 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 }
 
 func (e *eurekaRegistry) heartBeat(ins *fargo.Instance) {
-	ticker := time.Tick(e.heatBeatInterval)
+	ticker := time.NewTicker(e.heatBeatInterval)
 
 	for {
 		select {
 
 		case <-e.ctx.Done():
+			ticker.Stop()
 			return
 
-		case <-ticker:
+		case <-ticker.C:
 			if err := e.eurekaConn.HeartBeatInstance(ins); err != nil {
 				klog.Errorf("heartBeat error,err=%+v", err)
 			}

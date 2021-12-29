@@ -17,10 +17,10 @@ package registry
 import "errors"
 
 var (
-	NilInfoErr          = errors.New("registry info can't be nil")
-	NilAddrErr          = errors.New("registry addr can't be nil")
-	EmptyServiceNameErr = errors.New("registry service name can't be empty")
-	ConvertAddrErr      = errors.New("convert addr error")
-	MissIPErr           = errors.New("addr missing ip")
-	MissPortErr         = errors.New("addr missing port")
+	ErrNilInfo          = errors.New("registry info can't be nil")
+	ErrNilAddr          = errors.New("registry addr can't be nil")
+	ErrEmptyServiceName = errors.New("registry service name can't be empty")
+	ErrConvertAddr      = errors.New("convert addr error")
+	ErrMissIP           = errors.New("addr missing ip")
+	ErrMissPort         = errors.New("addr missing port")
 )
