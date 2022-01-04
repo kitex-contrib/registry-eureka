@@ -76,5 +76,4 @@ func TestEurekaDiscovery(t *testing.T) {
 	// resolve again
 	result, _ = res.Resolve(context.Background(), target)
 	assert.Equal(t, 0, len(result.Instances))
-
 }

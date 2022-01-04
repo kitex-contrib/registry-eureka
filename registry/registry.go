@@ -80,7 +80,6 @@ func (e *eurekaRegistry) Deregister(info *registry.Info) error {
 }
 
 func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, error) {
-
 	if info == nil {
 		return nil, ErrNilInfo
 	}
