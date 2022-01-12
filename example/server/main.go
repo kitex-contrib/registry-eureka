@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"time"
 
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api"
@@ -37,10 +38,10 @@ func (h *HelloImpl) Echo(ctx context.Context, req *api.Request) (resp *api.Respo
 
 func main() {
 	r := registry.NewEurekaRegistry([]string{"http://127.0.0.1:8761/eureka"}, 3*time.Second)
-
+	addr := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8888}
 	srv := hello.NewServer(new(HelloImpl), server.WithRegistry(r), server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
 		ServiceName: "Hello",
-	}))
+	}), server.WithServiceAddr(addr))
 	err := srv.Run()
 	if err != nil {
 		log.Fatal(err)
