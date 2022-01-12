@@ -26,19 +26,23 @@ import (
 	"github.com/kitex-contrib/registry-eureka/entity"
 )
 
+// eurekaResolver is a resolver using eureka.
 type eurekaResolver struct {
 	eurekaConn *fargo.EurekaConnection
 }
 
+// NewEurekaResolver creates a eureka resolver.
 func NewEurekaResolver(servers []string) discovery.Resolver {
 	conn := fargo.NewConn(servers...)
 	return &eurekaResolver{eurekaConn: &conn}
 }
 
+// Target implements the Resolver interface.
 func (r *eurekaResolver) Target(ctx context.Context, target rpcinfo.EndpointInfo) string {
 	return target.ServiceName()
 }
 
+// Resolve implements the Resolver interface.
 func (r *eurekaResolver) Resolve(ctx context.Context, desc string) (discovery.Result, error) {
 	application, err := r.eurekaConn.GetApp(desc)
 	if err != nil {
@@ -59,10 +63,12 @@ func (r *eurekaResolver) Resolve(ctx context.Context, desc string) (discovery.Re
 	return discovery.Result{CacheKey: desc, Cacheable: true, Instances: instances}, nil
 }
 
+// Diff implements the Resolver interface.
 func (r *eurekaResolver) Diff(cacheKey string, prev, next discovery.Result) (discovery.Change, bool) {
 	return discovery.DefaultDiff(cacheKey, prev, next)
 }
 
+// Name implements the Resolver interface.
 func (r *eurekaResolver) Name() string {
 	return constants.Eureka
 }

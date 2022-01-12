@@ -36,6 +36,7 @@ type eurekaRegistry struct {
 	cancelFunc       context.CancelFunc
 }
 
+// NewEurekaRegistry creates a eureka registry.
 func NewEurekaRegistry(servers []string, heatBeatInterval time.Duration) registry.Registry {
 	conn := fargo.NewConn(servers...)
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -47,6 +48,7 @@ func NewEurekaRegistry(servers []string, heatBeatInterval time.Duration) registr
 	}
 }
 
+// Register register a server with given registry info.
 func (e *eurekaRegistry) Register(info *registry.Info) error {
 	instance, err := e.eurekaInstance(info)
 	if err != nil {
@@ -57,19 +59,18 @@ func (e *eurekaRegistry) Register(info *registry.Info) error {
 		return err
 	}
 
-	// start heartBeat
 	go e.heartBeat(instance)
 
 	return nil
 }
 
+// Deregister deregister a server with given registry info.
 func (e *eurekaRegistry) Deregister(info *registry.Info) error {
 	instance, err := e.eurekaInstance(info)
 	if err != nil {
 		return err
 	}
 
-	// stop heartBeat
 	e.cancelFunc()
 
 	if err = e.eurekaConn.DeregisterInstance(instance); err != nil {

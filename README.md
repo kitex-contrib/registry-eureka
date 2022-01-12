@@ -69,5 +69,11 @@ use `spring-cloud-starter-netflix-eureka-server` in Java.
 ```
 use `docker-compose up` and run unit tests.
 
+## More info
+
+See example.
+
 ## Compatibility
 Compatible with eureka server v1.
+
+maintained by: [kinggo](https://github.com/longlihale/)
