@@ -1,11 +1,6 @@
 # registry-eureka (*This is a community driven project*)
 
-
----
-
 ## How to use?
-
----
 
 ### Server
 
