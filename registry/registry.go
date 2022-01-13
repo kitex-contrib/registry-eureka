@@ -98,7 +98,8 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 		return nil, ErrConvertAddr
 	}
 
-	if len(addr.IP.String()) == 0 {
+	if addr.IP.String() == "" || addr.IP.String() == "::" {
+
 		return nil, ErrMissIP
 	}
 
