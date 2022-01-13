@@ -99,7 +99,6 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 	}
 
 	if addr.IP.String() == "" || addr.IP.String() == "::" {
-
 		return nil, ErrMissIP
 	}
 
