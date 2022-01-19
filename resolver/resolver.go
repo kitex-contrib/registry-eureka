@@ -49,10 +49,6 @@ func (r *eurekaResolver) Resolve(ctx context.Context, desc string) (discovery.Re
 		return discovery.Result{}, err
 	}
 
-	if err = application.ParseAllMetadata(); err != nil {
-		return discovery.Result{}, err
-	}
-
 	eurekaInstances := application.Instances
 
 	instances, err := r.instances(eurekaInstances)
@@ -78,7 +74,7 @@ func (r *eurekaResolver) instances(instances []*fargo.Instance) ([]discovery.Ins
 	for _, instance := range instances {
 		dInstance, err := r.instance(instance)
 		if err != nil {
-			return res, nil
+			return nil, err
 		}
 		res = append(res, dInstance)
 	}

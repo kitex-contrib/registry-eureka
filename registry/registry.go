@@ -15,10 +15,10 @@
 package registry
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -32,19 +32,16 @@ import (
 type eurekaRegistry struct {
 	eurekaConn       *fargo.EurekaConnection
 	heatBeatInterval time.Duration
-	ctx              context.Context
-	cancelFunc       context.CancelFunc
+	closeChannel     chan struct{}
 }
 
 // NewEurekaRegistry creates a eureka registry.
 func NewEurekaRegistry(servers []string, heatBeatInterval time.Duration) registry.Registry {
 	conn := fargo.NewConn(servers...)
-	ctx, cancelFunc := context.WithCancel(context.Background())
 	return &eurekaRegistry{
 		eurekaConn:       &conn,
 		heatBeatInterval: heatBeatInterval,
-		ctx:              ctx,
-		cancelFunc:       cancelFunc,
+		closeChannel:     make(chan struct{}, 1),
 	}
 }
 
@@ -71,7 +68,7 @@ func (e *eurekaRegistry) Deregister(info *registry.Info) error {
 		return err
 	}
 
-	e.cancelFunc()
+	e.closeChannel <- struct{}{}
 
 	if err = e.eurekaConn.DeregisterInstance(instance); err != nil {
 		return err
@@ -93,16 +90,21 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 		return nil, ErrEmptyServiceName
 	}
 
-	addr, ok := info.Addr.(*net.TCPAddr)
-	if !ok {
-		return nil, ErrConvertAddr
+	host, portStr, err := net.SplitHostPort(info.Addr.String())
+	if err != nil {
+		return nil, err
 	}
 
-	if addr.IP.String() == "" || addr.IP.String() == "::" {
+	if host == "" || host == "::" {
 		return nil, ErrMissIP
 	}
 
-	if addr.Port == 0 {
+	port, err := strconv.ParseInt(portStr, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	if port == 0 {
 		return nil, ErrMissPort
 	}
 
@@ -119,8 +121,8 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 		HostName:       instanceKey,
 		InstanceId:     instanceKey,
 		App:            info.ServiceName,
-		IPAddr:         addr.IP.String(),
-		Port:           addr.Port,
+		IPAddr:         host,
+		Port:           int(port),
 		Status:         fargo.UP,
 		DataCenterInfo: fargo.DataCenterInfo{Name: fargo.MyOwn},
 	}
@@ -135,7 +137,7 @@ func (e *eurekaRegistry) heartBeat(ins *fargo.Instance) {
 	for {
 		select {
 
-		case <-e.ctx.Done():
+		case <-e.closeChannel:
 			ticker.Stop()
 			return
 

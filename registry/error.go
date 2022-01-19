@@ -20,7 +20,6 @@ var (
 	ErrNilInfo          = errors.New("registry info can't be nil")
 	ErrNilAddr          = errors.New("registry addr can't be nil")
 	ErrEmptyServiceName = errors.New("registry service name can't be empty")
-	ErrConvertAddr      = errors.New("convert addr error")
 	ErrMissIP           = errors.New("addr missing ip")
 	ErrMissPort         = errors.New("addr missing port")
 )
