@@ -15,10 +15,12 @@
 package registry
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -29,10 +31,16 @@ import (
 	"github.com/kitex-contrib/registry-eureka/entity"
 )
 
+type eurekaHeartbeat struct {
+	cancel      context.CancelFunc
+	instanceKey string
+}
+
 type eurekaRegistry struct {
 	eurekaConn       *fargo.EurekaConnection
 	heatBeatInterval time.Duration
-	closeChannel     chan struct{}
+	lock             *sync.RWMutex
+	registryIns      map[string]*eurekaHeartbeat
 }
 
 // NewEurekaRegistry creates a eureka registry.
@@ -41,7 +49,8 @@ func NewEurekaRegistry(servers []string, heatBeatInterval time.Duration) registr
 	return &eurekaRegistry{
 		eurekaConn:       &conn,
 		heatBeatInterval: heatBeatInterval,
-		closeChannel:     make(chan struct{}, 1),
+		registryIns:      make(map[string]*eurekaHeartbeat),
+		lock:             &sync.RWMutex{},
 	}
 }
 
@@ -52,11 +61,31 @@ func (e *eurekaRegistry) Register(info *registry.Info) error {
 		return err
 	}
 
+	instanceKey := fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String())
+
+	e.lock.RLock()
+	_, ok := e.registryIns[instanceKey]
+	e.lock.RUnlock()
+
+	if ok {
+		return fmt.Errorf("instance{%s} already registered", instanceKey)
+	}
+
 	if err = e.eurekaConn.RegisterInstance(instance); err != nil {
 		return err
 	}
 
-	go e.heartBeat(instance)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go e.heartBeat(ctx, instance)
+
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	e.registryIns[instanceKey] = &eurekaHeartbeat{
+		instanceKey: instanceKey,
+		cancel:      cancel,
+	}
 
 	return nil
 }
@@ -68,11 +97,24 @@ func (e *eurekaRegistry) Deregister(info *registry.Info) error {
 		return err
 	}
 
-	e.closeChannel <- struct{}{}
+	instanceKey := fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String())
+
+	e.lock.RLock()
+	insHeartbeat, ok := e.registryIns[instanceKey]
+	e.lock.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("instance{%s} has not registered", instanceKey)
+	}
 
 	if err = e.eurekaConn.DeregisterInstance(instance); err != nil {
 		return err
 	}
+
+	e.lock.Lock()
+	insHeartbeat.cancel()
+	delete(e.registryIns, instanceKey)
+	e.lock.Unlock()
 
 	return nil
 }
@@ -131,13 +173,13 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 	return instance, nil
 }
 
-func (e *eurekaRegistry) heartBeat(ins *fargo.Instance) {
+func (e *eurekaRegistry) heartBeat(ctx context.Context, ins *fargo.Instance) {
 	ticker := time.NewTicker(e.heatBeatInterval)
 
 	for {
 		select {
 
-		case <-e.closeChannel:
+		case <-ctx.Done():
 			ticker.Stop()
 			return
 
