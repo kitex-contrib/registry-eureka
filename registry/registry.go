@@ -146,7 +146,7 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 		return nil, err
 	}
 
-	if port == 0 {
+	if port <= 0 {
 		return nil, ErrMissPort
 	}
 
