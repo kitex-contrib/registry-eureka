@@ -16,6 +16,7 @@ package test
 
 import (
 	"context"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -76,4 +77,123 @@ func TestEurekaDiscovery(t *testing.T) {
 	// resolve again
 	result, _ = res.Resolve(context.Background(), target)
 	assert.Equal(t, 0, len(result.Instances))
+}
+
+func TestEurekaDiscoveryWithMultipleInstance(t *testing.T) {
+	r := registry2.NewEurekaRegistry([]string{"http://127.0.0.1:8761/eureka"}, 11*time.Second)
+	info1 := &registry.Info{
+		ServiceName:  "test",
+		Weight:       11,
+		PayloadCodec: "thrift",
+		Tags:         map[string]string{"idc": "hl"},
+		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1},
+	}
+	info2 := &registry.Info{
+		ServiceName:  "test",
+		Weight:       12,
+		PayloadCodec: "thrift",
+		Tags:         map[string]string{"idc": "hl"},
+		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 2},
+	}
+	info3 := &registry.Info{
+		ServiceName:  "test",
+		Weight:       13,
+		PayloadCodec: "thrift",
+		Tags:         map[string]string{"idc": "hl"},
+		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 3},
+	}
+	addrMap := map[string]int{
+		info1.Addr.String(): info1.Weight,
+		info2.Addr.String(): info2.Weight,
+		info3.Addr.String(): info3.Weight,
+	}
+
+	assert.Nil(t, r.Register(info1))
+	assert.Nil(t, r.Register(info2))
+	assert.Nil(t, r.Register(info3))
+
+	res := resolver.NewEurekaResolver([]string{"http://127.0.0.1:8761/eureka"})
+
+	target := res.Target(context.Background(), rpcinfo.NewEndpointInfo("test", "", nil, nil))
+
+	// prevent perception delay to affect test case
+	time.Sleep(30 * time.Second)
+
+	result, err := res.Resolve(context.Background(), target)
+	assert.Nil(t, err)
+	assert.Len(t, result.Instances, 3)
+	instances := result.Instances
+	for _, instance := range instances {
+		addr := instance.Address().String()
+		weight, ok := addrMap[addr]
+		assert.Equal(t, ok, true)
+		assert.Equal(t, weight, instance.Weight())
+		v1, exist := instance.Tag("idc")
+		assert.Equal(t, true, exist)
+		assert.Equal(t, "hl", v1)
+	}
+
+	assert.Nil(t, r.Deregister(info1))
+	assert.Nil(t, r.Deregister(info2))
+
+	// prevent perception delay to affect test case
+	time.Sleep(30 * time.Second)
+
+	result, err = res.Resolve(context.Background(), target)
+	assert.Nil(t, err)
+	assert.Equal(t, len(result.Instances), 1)
+	instance := result.Instances[0]
+	assert.Equal(t, instance.Weight(), info3.Weight)
+	assert.Equal(t, instance.Address().String(), info3.Addr.String())
+
+	assert.Nil(t, r.Deregister(info3))
+
+	// prevent perception delay to affect test case
+	time.Sleep(30 * time.Second)
+
+	result, err = res.Resolve(context.Background(), target)
+	assert.Equal(t, err, io.EOF)
+	assert.Equal(t, len(result.Instances), 0)
+}
+
+func TestEurekaDiscoveryWithInvalidInstanceInfo(t *testing.T) {
+	r := registry2.NewEurekaRegistry([]string{"http://127.0.0.1:8761/eureka"}, 11*time.Second)
+
+	assert.Equal(t, registry2.ErrNilInfo, r.Register(nil))
+
+	info1 := &registry.Info{
+		ServiceName:  "",
+		Weight:       10,
+		PayloadCodec: "thrift",
+		Tags:         map[string]string{"idc": "hl"},
+		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1},
+	}
+	assert.Equal(t, registry2.ErrEmptyServiceName, r.Register(info1))
+
+	info2 := &registry.Info{
+		ServiceName:  "test",
+		Weight:       10,
+		PayloadCodec: "thrift",
+		Tags:         map[string]string{"idc": "hl"},
+		Addr:         nil,
+	}
+	assert.Equal(t, registry2.ErrNilAddr, r.Register(info2))
+
+	info3 := &registry.Info{
+		ServiceName:  "test",
+		Weight:       10,
+		PayloadCodec: "thrift",
+		Tags:         map[string]string{"idc": "hl"},
+		Addr:         &net.TCPAddr{Port: 1},
+	}
+	assert.Equal(t, registry2.ErrMissIP, r.Register(info3))
+
+	info4 := &registry.Info{
+		ServiceName:  "test",
+		Weight:       10,
+		PayloadCodec: "thrift",
+		Tags:         map[string]string{"idc": "hl"},
+		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)},
+	}
+	assert.Equal(t, registry2.ErrMissPort, r.Register(info4))
 }

@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
+
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/hudl/fargo"
@@ -54,6 +56,10 @@ func (r *eurekaResolver) Resolve(ctx context.Context, desc string) (discovery.Re
 	instances, err := r.instances(eurekaInstances)
 	if err != nil {
 		return discovery.Result{}, err
+	}
+
+	if len(instances) == 0 {
+		return discovery.Result{}, kerrors.ErrNoMoreInstance
 	}
 
 	return discovery.Result{CacheKey: desc, Cacheable: true, Instances: instances}, nil
