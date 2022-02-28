@@ -27,7 +27,6 @@ import (
 
 func main() {
 	r := resolver.NewEurekaResolver([]string{"http://127.0.0.1:8761/eureka"})
-
 	cli := hello.MustNewClient("Hello", client.WithResolver(r))
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)

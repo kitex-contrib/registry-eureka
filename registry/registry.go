@@ -66,7 +66,6 @@ func (e *eurekaRegistry) Register(info *registry.Info) error {
 	e.lock.RLock()
 	_, ok := e.registryIns[instanceKey]
 	e.lock.RUnlock()
-
 	if ok {
 		return fmt.Errorf("instance{%s} already registered", instanceKey)
 	}
@@ -76,12 +75,10 @@ func (e *eurekaRegistry) Register(info *registry.Info) error {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	go e.heartBeat(ctx, instance)
 
 	e.lock.Lock()
 	defer e.lock.Unlock()
-
 	e.registryIns[instanceKey] = &eurekaHeartbeat{
 		instanceKey: instanceKey,
 		cancel:      cancel,
@@ -102,7 +99,6 @@ func (e *eurekaRegistry) Deregister(info *registry.Info) error {
 	e.lock.RLock()
 	insHeartbeat, ok := e.registryIns[instanceKey]
 	e.lock.RUnlock()
-
 	if !ok {
 		return fmt.Errorf("instance{%s} has not registered", instanceKey)
 	}
@@ -123,11 +119,9 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 	if info == nil {
 		return nil, ErrNilInfo
 	}
-
 	if info.Addr == nil {
 		return nil, ErrNilAddr
 	}
-
 	if len(info.ServiceName) == 0 {
 		return nil, ErrEmptyServiceName
 	}
@@ -136,7 +130,6 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 	if err != nil {
 		return nil, err
 	}
-
 	if host == "" || host == "::" {
 		return nil, ErrMissIP
 	}
@@ -145,7 +138,6 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 	if err != nil {
 		return nil, err
 	}
-
 	if port <= 0 {
 		return nil, ErrMissPort
 	}
@@ -175,14 +167,11 @@ func (e *eurekaRegistry) eurekaInstance(info *registry.Info) (*fargo.Instance, e
 
 func (e *eurekaRegistry) heartBeat(ctx context.Context, ins *fargo.Instance) {
 	ticker := time.NewTicker(e.heatBeatInterval)
-
 	for {
 		select {
-
 		case <-ctx.Done():
 			ticker.Stop()
 			return
-
 		case <-ticker.C:
 			if err := e.eurekaConn.HeartBeatInstance(ins); err != nil {
 				klog.Errorf("heartBeat error,err=%+v", err)
