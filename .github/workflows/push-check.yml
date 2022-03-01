@@ -8,7 +8,7 @@ jobs:
 
     services:
       eureka:
-        image: 'springcloud/eureka'
+        image: 'xdockerh/eureka-server:latest'
         ports:
           - 8761:8761
 
