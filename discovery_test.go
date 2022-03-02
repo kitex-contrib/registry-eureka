@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
-
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/kitex-contrib/registry-eureka/resolver"
 
