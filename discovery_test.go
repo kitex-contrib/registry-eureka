@@ -16,25 +16,23 @@ package test
 
 import (
 	"context"
-	"io"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/kitex-contrib/registry-eureka/resolver"
-
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/registry"
-	"github.com/stretchr/testify/assert"
-
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	registry2 "github.com/kitex-contrib/registry-eureka/registry"
+	"github.com/kitex-contrib/registry-eureka/resolver"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEurekaDiscovery(t *testing.T) {
 	var err error
 	r := registry2.NewEurekaRegistry([]string{"http://127.0.0.1:8761/eureka"}, 11*time.Second)
 	tags := map[string]string{"idc": "hl"}
-	addr := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1}
+	addr := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8888}
 	info := &registry.Info{
 		ServiceName:  "test",
 		Weight:       10,
@@ -42,19 +40,16 @@ func TestEurekaDiscovery(t *testing.T) {
 		Tags:         tags,
 		Addr:         addr,
 	}
+	// 1. register one instance
 	err = r.Register(info)
 	assert.Nil(t, err)
 
 	res := resolver.NewEurekaResolver([]string{"http://127.0.0.1:8761/eureka"})
-
 	target := res.Target(context.Background(), rpcinfo.NewEndpointInfo("test", "", nil, nil))
 
-	// prevent perception delay to affect test case
-	time.Sleep(30 * time.Second)
-
+	// 2. expect return one instance when do discovery
 	result, err := res.Resolve(context.Background(), target)
 	assert.Nil(t, err)
-
 	assert.Equal(t, 1, len(result.Instances))
 
 	instance := result.Instances[0]
@@ -67,15 +62,13 @@ func TestEurekaDiscovery(t *testing.T) {
 		assert.Equal(t, v, v1)
 	}
 
-	// deregister
+	// 3. deregister one instance that register instantly
 	err = r.Deregister(info)
 	assert.Nil(t, err)
 
-	// prevent perception delay to affect test case
-	time.Sleep(30 * time.Second)
-
-	// resolve again
-	result, _ = res.Resolve(context.Background(), target)
+	// 4. expect no instance when do discovery again
+	result, err = res.Resolve(context.Background(), target)
+	assert.Equal(t, kerrors.ErrNoMoreInstance, err)
 	assert.Equal(t, 0, len(result.Instances))
 }
 
@@ -86,21 +79,21 @@ func TestEurekaDiscoveryWithMultipleInstance(t *testing.T) {
 		Weight:       11,
 		PayloadCodec: "thrift",
 		Tags:         map[string]string{"idc": "hl"},
-		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1},
+		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8888},
 	}
 	info2 := &registry.Info{
 		ServiceName:  "test",
 		Weight:       12,
 		PayloadCodec: "thrift",
 		Tags:         map[string]string{"idc": "hl"},
-		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 2},
+		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8889},
 	}
 	info3 := &registry.Info{
 		ServiceName:  "test",
 		Weight:       13,
 		PayloadCodec: "thrift",
 		Tags:         map[string]string{"idc": "hl"},
-		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 3},
+		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8890},
 	}
 	addrMap := map[string]int{
 		info1.Addr.String(): info1.Weight,
@@ -108,6 +101,7 @@ func TestEurekaDiscoveryWithMultipleInstance(t *testing.T) {
 		info3.Addr.String(): info3.Weight,
 	}
 
+	// 1. register three instance
 	assert.Nil(t, r.Register(info1))
 	assert.Nil(t, r.Register(info2))
 	assert.Nil(t, r.Register(info3))
@@ -116,9 +110,7 @@ func TestEurekaDiscoveryWithMultipleInstance(t *testing.T) {
 
 	target := res.Target(context.Background(), rpcinfo.NewEndpointInfo("test", "", nil, nil))
 
-	// prevent perception delay to affect test case
-	time.Sleep(30 * time.Second)
-
+	// 2. expect three instances when do discovery
 	result, err := res.Resolve(context.Background(), target)
 	assert.Nil(t, err)
 	assert.Len(t, result.Instances, 3)
@@ -126,39 +118,38 @@ func TestEurekaDiscoveryWithMultipleInstance(t *testing.T) {
 	for _, instance := range instances {
 		addr := instance.Address().String()
 		weight, ok := addrMap[addr]
-		assert.Equal(t, ok, true)
+		assert.Equal(t, true, ok)
 		assert.Equal(t, weight, instance.Weight())
 		v1, exist := instance.Tag("idc")
 		assert.Equal(t, true, exist)
 		assert.Equal(t, "hl", v1)
 	}
 
+	// 3. deregister two instances that register instantly
 	assert.Nil(t, r.Deregister(info1))
 	assert.Nil(t, r.Deregister(info2))
 
-	// prevent perception delay to affect test case
-	time.Sleep(30 * time.Second)
-
+	// 4. expect just one instances when do discovery
 	result, err = res.Resolve(context.Background(), target)
 	assert.Nil(t, err)
-	assert.Equal(t, len(result.Instances), 1)
+	assert.Equal(t, 1, len(result.Instances))
 	instance := result.Instances[0]
-	assert.Equal(t, instance.Weight(), info3.Weight)
-	assert.Equal(t, instance.Address().String(), info3.Addr.String())
+	assert.Equal(t, info3.Weight, instance.Weight())
+	assert.Equal(t, info3.Addr.String(), instance.Address().String())
 
+	// 5. deregister finally one instance that register instantly
 	assert.Nil(t, r.Deregister(info3))
 
-	// prevent perception delay to affect test case
-	time.Sleep(30 * time.Second)
-
+	// 6. expect no instances when do discovery
 	result, err = res.Resolve(context.Background(), target)
-	assert.Equal(t, err, io.EOF)
-	assert.Equal(t, len(result.Instances), 0)
+	assert.Equal(t, kerrors.ErrNoMoreInstance, err)
+	assert.Equal(t, 0, len(result.Instances))
 }
 
 func TestEurekaDiscoveryWithInvalidInstanceInfo(t *testing.T) {
 	r := registry2.NewEurekaRegistry([]string{"http://127.0.0.1:8761/eureka"}, 11*time.Second)
 
+	// 1. try to register nil instance
 	assert.Equal(t, registry2.ErrNilInfo, r.Register(nil))
 
 	info1 := &registry.Info{
@@ -166,8 +157,9 @@ func TestEurekaDiscoveryWithInvalidInstanceInfo(t *testing.T) {
 		Weight:       10,
 		PayloadCodec: "thrift",
 		Tags:         map[string]string{"idc": "hl"},
-		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1},
+		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8888},
 	}
+	// 2. try to register one instance that not have serviceName
 	assert.Equal(t, registry2.ErrEmptyServiceName, r.Register(info1))
 
 	info2 := &registry.Info{
@@ -177,6 +169,7 @@ func TestEurekaDiscoveryWithInvalidInstanceInfo(t *testing.T) {
 		Tags:         map[string]string{"idc": "hl"},
 		Addr:         nil,
 	}
+	// 3. try to register one instance that not have addr
 	assert.Equal(t, registry2.ErrNilAddr, r.Register(info2))
 
 	info3 := &registry.Info{
@@ -184,8 +177,9 @@ func TestEurekaDiscoveryWithInvalidInstanceInfo(t *testing.T) {
 		Weight:       10,
 		PayloadCodec: "thrift",
 		Tags:         map[string]string{"idc": "hl"},
-		Addr:         &net.TCPAddr{Port: 1},
+		Addr:         &net.TCPAddr{Port: 8889},
 	}
+	// 4. try to register one instance that not have ip
 	assert.Equal(t, registry2.ErrMissIP, r.Register(info3))
 
 	info4 := &registry.Info{
@@ -195,5 +189,6 @@ func TestEurekaDiscoveryWithInvalidInstanceInfo(t *testing.T) {
 		Tags:         map[string]string{"idc": "hl"},
 		Addr:         &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)},
 	}
+	// 5. try to register one instance that not have port
 	assert.Equal(t, registry2.ErrMissPort, r.Register(info4))
 }
