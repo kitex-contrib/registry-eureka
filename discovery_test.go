@@ -21,13 +21,11 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/kitex-contrib/registry-eureka/resolver"
-
 	"github.com/cloudwego/kitex/pkg/registry"
-	"github.com/stretchr/testify/assert"
-
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	registry2 "github.com/kitex-contrib/registry-eureka/registry"
+	"github.com/kitex-contrib/registry-eureka/resolver"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEurekaDiscovery(t *testing.T) {
