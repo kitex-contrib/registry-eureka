@@ -51,6 +51,49 @@ func main() {
 }
 ```
 
+## Authentication
+
+use `HTTP Basic Auth`
+
+### Server
+
+```go
+import (
+    ...
+    euregistry "github.com/kitex-contrib/registry-eureka/registry"
+    "github.com/cloudwego/kitex/server"
+    "github.com/cloudwego/kitex/pkg/rpcinfo"
+    ...
+)
+
+func main() {
+    ...
+    r = euregistry.NewEurekaRegistry([]string{"http://username:password@127.0.0.1:8080/eureka"}, 15*time.Second)
+	svr := echo.NewServer(new(EchoImpl), server.WithRegistry(r),
+    ...
+}
+```
+
+### Client
+
+```go
+import (
+    ...
+    "github.com/kitex-contrib/registry-eureka/resolver"
+    "github.com/cloudwego/kitex/client"
+    ...
+)
+
+func main() {
+    ...
+    r = resolver.NewEurekaResolver([]string{"http://username:password@127.0.0.1:8080/eureka"})
+    client, err := echo.NewClient("echo", 
+        client.WithResolver(r),
+    )
+    ...
+}
+```
+
 ## Test
 
 use `spring-cloud-starter-netflix-eureka-server` in Java.
